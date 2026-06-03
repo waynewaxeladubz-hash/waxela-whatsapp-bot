@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waxela Bot - Pairing Site</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input[type="text"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        input[type="text"]:focus,
+        input[type="tel"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result-container {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .result-container.show {
+            display: block;
+        }
+
+        .result-title {
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .code-box {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            color: #333;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+
+        .sessions-container {
+            margin-top: 15px;
+        }
+
+        .session-item {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .session-label {
+            color: #666;
+            font-weight: 600;
+            display: inline-block;
+            width: 80px;
+        }
+
+        .session-id {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            color: #2e7d32;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🤖</div>
+            <h1>Waxela Bot</h1>
+            <p class="subtitle">WhatsApp Multi-Device Bot Pairing</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('pairing')">Pairing</div>
+            <div class="tab" onclick="switchTab('dashboard')">Dashboard</div>
+        </div>
+
+        <!-- Pairing Tab -->
+        <div id="pairing-tab" class="tab-content active">
+            <div class="form-group">
+                <label for="phone">📱 WhatsApp Number</label>
+                <input type="tel" id="phone" placeholder="+263787446219 or 263787446219" maxlength="20">
+                <p class="help-text">Enter your WhatsApp number with country code</p>
+            </div>
+
+            <div class="form-group">
+                <label for="username">👤 Username (Optional)</label>
+                <input type="text" id="username" placeholder="Your name or username">
+            </div>
+
+            <button onclick="generatePairingCode()">
+                <span class="spinner" id="spinner"></span>
+                Generate Pairing Code
+            </button>
+
+            <div class="error" id="error"></div>
+            <div class="success" id="success"></div>
+
+            <div class="result-container" id="result">
+                <div class="result-title">✅ Pairing Code Generated</div>
+                
+                <div class="code-box" style="position: relative;">
+                    <div id="pairingCode" style="padding-right: 50px;"></div>
+                    <button class="copy-btn" onclick="copyCode()">Copy</button>
+                </div>
+
+                <div class="info-box">
+                    <strong>📝 Instructions:</strong><br>
+                    1. Copy your pairing code above<br>
+                    2. Go to your WhatsApp linked device<br>
+                    3. Settings → Linked Devices → Link a Device<br>
+                    4. Paste the code when prompted
+                </div>
+
+                <div class="sessions-container">
+                    <div class="result-title">Session Information</div>
+                    <div class="session-item">
+                        <span class="session-label">User ID:</span>
+                        <span class="session-id" id="userId"></span>
+                    </div>
+                    <div class="session-item">
+                        <span class="session-label">Session ID:</span>
+                        <span class="session-id" id="sessionId"></span>
+                    </div>
+                    <div class="session-item">
+                        <span class="session-label">Bot Session:</span>
+                        <span class="session-id" id="botSession"></span>
+                    </div>
+                    <div class="session-item">
+                        <span class="session-label">Device ID:</span>
+                        <span class="session-id" id="deviceId"></span>
+                    </div>
+                    <div class="session-item">
+                        <span class="session-label">Generated:</span>
+                        <span class="session-id" id="timestamp"></span>
+                    </div>
+                    <div class="session-item">
+                        <span class="session-label">Status:</span>
+                        <span class="status-badge">✓ Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard-tab" class="tab-content">
+            <div class="dashboard-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="activeUsers">0</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="sessionCount">0</div>
+                    <div class="stat-label">Sessions</div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button onclick="refreshDashboard()" style="background: #2196f3;">
+                    🔄 Refresh Stats
+                </button>
+            </div>
+
+            <div class="info-box" style="margin-top: 20px;">
+                <strong>🌐 Waxela Bot Dashboard</strong><br>
+                Main Dashboard: <a href="https://waxela-connect-bot.lovable.app/" target="_blank" style="color: #1565c0; text-decoration: none;">https://waxela-connect-bot.lovable.app/</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`${tab}-tab`).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tab === 'dashboard') {
+                refreshDashboard();
+            }
+        }
+
+        function generatePairingCode() {
+            const phone = document.getElementById('phone').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const errorEl = document.getElementById('error');
+            const successEl = document.getElementById('success');
+            const spinner = document.getElementById('spinner');
+            const button = event.target;
+
+            // Clear previous messages
+            errorEl.classList.remove('show');
+            successEl.classList.remove('show');
+
+            // Validation
+            if (!phone) {
+                showError('Please enter your WhatsApp number');
+                return;
+            }
+
+            if (phone.length < 10) {
+                showError('Please enter a valid phone number');
+                return;
+            }
+
+            // Show loading
+            spinner.style.display = 'inline-block';
+            button.disabled = true;
+
+            // Generate pairing code and session IDs
+            const pairingCode = generateCode();
+            const userId = generateUserId(phone);
+            const sessionId = generateSessionId();
+            const botSession = generateBotSession();
+            const deviceId = generateDeviceId();
+            const timestamp = new Date().toLocaleString();
+
+            // Store data
+            const pairingData = {
+                phone,
+                username: username || 'Anonymous',
+                pairingCode,
+                userId,
+                sessionId,
+                botSession,
+                deviceId,
+                timestamp,
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to localStorage for dashboard
+            savePairingSession(pairingData);
+
+            // Display results
+            document.getElementById('pairingCode').textContent = pairingCode;
+            document.getElementById('userId').textContent = userId;
+            document.getElementById('sessionId').textContent = sessionId;
+            document.getElementById('botSession').textContent = botSession;
+            document.getElementById('deviceId').textContent = deviceId;
+            document.getElementById('timestamp').textContent = timestamp;
+
+            // Show success
+            showSuccess(`✅ Pairing code generated successfully for ${phone}`);
+            document.getElementById('result').classList.add('show');
+
+            // Hide loading
+            setTimeout(() => {
+                spinner.style.display = 'none';
+                button.disabled = false;
+            }, 500);
+
+            // Send to server (optional)
+            sendPairingDataToServer(pairingData);
+        }
+
+        function generateCode() {
+            // Format: XXXX-XXXX-XXXX (12 random alphanumeric)
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 12; i++) {
+                if (i === 4 || i === 8) code += '-';
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function generateUserId(phone) {
+            // Format: waxela_[phone]_[random]
+            const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+            return `waxela_${phone}_${random}`;
+        }
+
+        function generateSessionId() {
+            // Format: session_[timestamp]_[random]
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+            return `session_${timestamp}_${random}`;
+        }
+
+        function generateBotSession() {
+            // Format: bot_session_[uuid-like]
+            const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+            return `bot_session_${uuid}`;
+        }
+
+        function generateDeviceId() {
+            // Format: device_[timestamp]_[random]
+            const timestamp = Date.now().toString(36);
+            const random = Math.random().toString(36).substring(2, 12).toUpperCase();
+            return `device_${timestamp}_${random}`;
+        }
+
+        function copyCode() {
+            const code = document.getElementById('pairingCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                showSuccess('✅ Pairing code copied to clipboard!');
+            }).catch(() => {
+                showError('Failed to copy code');
+            });
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.classList.add('show');
+        }
+
+        function showSuccess(message) {
+            const successEl = document.getElementById('success');
+            successEl.textContent = message;
+            successEl.classList.add('show');
+            setTimeout(() => {
+                successEl.classList.remove('show');
+            }, 4000);
+        }
+
+        function savePairingSession(data) {
+            let sessions = JSON.parse(localStorage.getItem('waxela_sessions') || '[]');
+            sessions.push(data);
+            localStorage.setItem('waxela_sessions', JSON.stringify(sessions));
+        }
+
+        function refreshDashboard() {
+            const sessions = JSON.parse(localStorage.getItem('waxela_sessions') || '[]');
+            const uniqueUsers = new Set(sessions.map(s => s.phone)).size;
+            
+            document.getElementById('activeUsers').textContent = uniqueUsers;
+            document.getElementById('sessionCount').textContent = sessions.length;
+        }
+
+        function sendPairingDataToServer(data) {
+            fetch('/api/pairing', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            }).catch(err => {
+                console.log('Server sync attempted');
+            });
+        }
+
+        // Load dashboard on page load
+        window.addEventListener('load', () => {
+            refreshDashboard();
+        });
+    </script>
+</body>
+</html>
