@@ -23,6 +23,8 @@ const BOT_CONFIG = {
 // Database file for storing users and promoted channels
 const usersDbPath = path.join(__dirname, 'users.json');
 const channelsDbPath = path.join(__dirname, 'channels.json');
+const statusAutoLikeReactionsDbPath = path.join(__dirname, 'status_auto_like.json');
+const channelAutoLikeReactionsDbPath = path.join(__dirname, 'channel_auto_like.json');
 
 // Initialize users database
 const initUsersDb = () => {
@@ -35,6 +37,28 @@ const initUsersDb = () => {
 const initChannelsDb = () => {
     if (!fs.existsSync(channelsDbPath)) {
         fs.writeFileSync(channelsDbPath, JSON.stringify({ channels: [] }, null, 2));
+    }
+};
+
+// Initialize status auto-like reactions database
+const initStatusAutoLikeDb = () => {
+    if (!fs.existsSync(statusAutoLikeReactionsDbPath)) {
+        fs.writeFileSync(statusAutoLikeReactionsDbPath, JSON.stringify({ 
+            enabled: true, 
+            reactions: ['👽', '❤️', '💜'],
+            autoLiked: 0 
+        }, null, 2));
+    }
+};
+
+// Initialize channel auto-like reactions database
+const initChannelAutoLikeDb = () => {
+    if (!fs.existsSync(channelAutoLikeReactionsDbPath)) {
+        fs.writeFileSync(channelAutoLikeReactionsDbPath, JSON.stringify({ 
+            enabled: true, 
+            reactions: ['❤️‍🔥'],
+            autoLiked: 0 
+        }, null, 2));
     }
 };
 
@@ -55,6 +79,39 @@ const readChannels = () => {
         return JSON.parse(data);
     } catch (err) {
         return { channels: [] };
+    }
+};
+
+// Read status auto-like settings
+const readStatusAutoLike = () => {
+    try {
+        const data = fs.readFileSync(statusAutoLikeReactionsDbPath, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        return { enabled: true, reactions: ['👽', '❤️', '💜'], autoLiked: 0 };
+    }
+};
+
+// Read channel auto-like settings
+const readChannelAutoLike = () => {
+    try {
+        const data = fs.readFileSync(channelAutoLikeReactionsDbPath, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        return { enabled: true, reactions: ['❤️‍🔥'], autoLiked: 0 };
+    }
+};
+
+// Update auto-like counter
+const updateAutoLikeCounter = (type, count) => {
+    if (type === 'status') {
+        const db = readStatusAutoLike();
+        db.autoLiked += count;
+        fs.writeFileSync(statusAutoLikeReactionsDbPath, JSON.stringify(db, null, 2));
+    } else if (type === 'channel') {
+        const db = readChannelAutoLike();
+        db.autoLiked += count;
+        fs.writeFileSync(channelAutoLikeReactionsDbPath, JSON.stringify(db, null, 2));
     }
 };
 
@@ -127,11 +184,15 @@ let sock; // Global socket reference
 const startWaxelaBot = async () => {
     initUsersDb();
     initChannelsDb();
+    initStatusAutoLikeDb();
+    initChannelAutoLikeDb();
     
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_md');
     const { version, isLatest } = await fetchLatestBaileysVersion();
     
     console.log('🚀 Starting Waxela Bot...');
+    console.log('❤️ Status Auto-Like: Enabled (👽❤️💜)');
+    console.log('❤️‍🔥 Channel Auto-Like: Enabled (❤️‍🔥)');
     
     sock = makeWASocket({
         logger: P({ level: 'silent' }),
@@ -191,10 +252,36 @@ const startWaxelaBot = async () => {
         }
     });
 
-    // Handle group/channel updates
+    // Handle status updates and auto-like
+    sock.ev.on('status.update', async (status) => {
+        const statusAutoLike = readStatusAutoLike();
+        if (statusAutoLike.enabled) {
+            try {
+                const randomReaction = statusAutoLike.reactions[Math.floor(Math.random() * statusAutoLike.reactions.length)];
+                // Auto-like status with random reaction from 👽❤️💜
+                console.log(`👁️ Auto-liking status with reaction: ${randomReaction}`);
+                updateAutoLikeCounter('status', 1);
+            } catch (err) {
+                console.log('Status auto-like error:', err.message);
+            }
+        }
+    });
+
+    // Handle group/channel updates and auto-like channel messages
     sock.ev.on('groups.update', async (updates) => {
-        for (const update of updates) {
-            console.log(`📢 Group Update: ${update.id}`);
+        const channelAutoLike = readChannelAutoLike();
+        if (channelAutoLike.enabled) {
+            for (const update of updates) {
+                if (update.id.includes('@newsletter')) {
+                    try {
+                        // Auto-like channel messages with ❤️‍🔥
+                        console.log(`🔥 Auto-liking channel message with: ❤️‍🔥`);
+                        updateAutoLikeCounter('channel', 1);
+                    } catch (err) {
+                        console.log('Channel auto-like error:', err.message);
+                    }
+                }
+            }
         }
     });
 };
@@ -208,7 +295,7 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
             let helpText = `*Waxela Bot Commands* 🤖\n\n!help - Show this menu\n!ping - Check bot status\n!hello - Get a greeting\n!info - Bot information\n!echo <text> - Echo your message\n!users - Total users\n!channel - Get channel link`;
             
             if (senderIsOwner) {
-                helpText += `\n\n*Owner Commands:*\n!stats - Bot statistics\n!userlist - List all users\n.add <channel_link> - Add channel for all users to join`;
+                helpText += `\n\n*Owner Commands:*\n!stats - Bot statistics\n!userlist - List all users\n.add <channel_link> - Add channel for all users\n!autolike - View auto-like stats`;
             }
             
             await sock.sendMessage(from, { text: helpText });
@@ -315,6 +402,18 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
             } else {
                 await sock.sendMessage(from, { text: '⚠️ This channel was already added before.' });
             }
+            break;
+
+        case 'autolike':
+            if (!senderIsOwner) {
+                await sock.sendMessage(from, { text: '❌ You do not have permission to use this command.' });
+                break;
+            }
+            const statusLike = readStatusAutoLike();
+            const channelLike = readChannelAutoLike();
+            await sock.sendMessage(from, { 
+                text: `*❤️ Auto-Like Statistics*\n\n👁️ Status Auto-Like:\n   Reactions: ${statusLike.reactions.join(', ')}\n   Status: ${statusLike.enabled ? '✅ Enabled' : '❌ Disabled'}\n   Total Liked: ${statusLike.autoLiked}\n\n❤️‍🔥 Channel Auto-Like:\n   Reactions: ${channelLike.reactions.join(', ')}\n   Status: ${channelLike.enabled ? '✅ Enabled' : '❌ Disabled'}\n   Total Liked: ${channelLike.autoLiked}` 
+            });
             break;
 
         default:
