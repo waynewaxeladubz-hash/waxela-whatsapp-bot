@@ -20,13 +20,21 @@ const BOT_CONFIG = {
     channelId: '0029Vb88O9WAu3aNi8xbiM2J@newsletter'
 };
 
-// Database file for storing users
+// Database file for storing users and promoted channels
 const usersDbPath = path.join(__dirname, 'users.json');
+const channelsDbPath = path.join(__dirname, 'channels.json');
 
 // Initialize users database
 const initUsersDb = () => {
     if (!fs.existsSync(usersDbPath)) {
         fs.writeFileSync(usersDbPath, JSON.stringify({ users: [], joinedAt: new Date() }, null, 2));
+    }
+};
+
+// Initialize channels database
+const initChannelsDb = () => {
+    if (!fs.existsSync(channelsDbPath)) {
+        fs.writeFileSync(channelsDbPath, JSON.stringify({ channels: [] }, null, 2));
     }
 };
 
@@ -37,6 +45,16 @@ const readUsers = () => {
         return JSON.parse(data);
     } catch (err) {
         return { users: [] };
+    }
+};
+
+// Read channels from database
+const readChannels = () => {
+    try {
+        const data = fs.readFileSync(channelsDbPath, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        return { channels: [] };
     }
 };
 
@@ -69,6 +87,24 @@ const updateUserMessageCount = (userId) => {
     }
 };
 
+// Add channel to database
+const addChannel = (channelLink) => {
+    const db = readChannels();
+    const channelExists = db.channels.find(c => c.link === channelLink);
+    
+    if (!channelExists) {
+        db.channels.push({
+            link: channelLink,
+            addedAt: new Date().toISOString(),
+            notified: []
+        });
+        fs.writeFileSync(channelsDbPath, JSON.stringify(db, null, 2));
+        console.log(`✅ Channel added: ${channelLink}`);
+        return true;
+    }
+    return false;
+};
+
 // Check if user is owner
 const isOwner = (phoneNumber) => {
     return OWNER.phoneNumbers.some(num => phoneNumber.includes(num));
@@ -79,15 +115,25 @@ const formatPhoneNumber = (jid) => {
     return jid.replace('@s.whatsapp.net', '').replace('@g.us', '');
 };
 
+// Extract channel link from text
+const extractChannelLink = (text) => {
+    const linkRegex = /https:\/\/(whatsapp\.com\/channel\/[\w]+)/g;
+    const match = text.match(linkRegex);
+    return match ? match[0] : null;
+};
+
+let sock; // Global socket reference
+
 const startWaxelaBot = async () => {
     initUsersDb();
+    initChannelsDb();
     
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_md');
     const { version, isLatest } = await fetchLatestBaileysVersion();
     
     console.log('🚀 Starting Waxela Bot...');
     
-    const sock = makeWASocket({
+    sock = makeWASocket({
         logger: P({ level: 'silent' }),
         printQRInTerminal: true,
         auth: state,
@@ -162,7 +208,7 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
             let helpText = `*Waxela Bot Commands* 🤖\n\n!help - Show this menu\n!ping - Check bot status\n!hello - Get a greeting\n!info - Bot information\n!echo <text> - Echo your message\n!users - Total users\n!channel - Get channel link`;
             
             if (senderIsOwner) {
-                helpText += `\n\n*Owner Commands:*\n!stats - Bot statistics\n!userlist - List all users`;
+                helpText += `\n\n*Owner Commands:*\n!stats - Bot statistics\n!userlist - List all users\n.add <channel_link> - Add channel for all users to join`;
             }
             
             await sock.sendMessage(from, { text: helpText });
@@ -226,6 +272,49 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
                 userList += `\n... and ${db2.users.length - 10} more users`;
             }
             await sock.sendMessage(from, { text: userList });
+            break;
+
+        case 'add':
+            if (!senderIsOwner) {
+                await sock.sendMessage(from, { text: '❌ You do not have permission to use this command.' });
+                break;
+            }
+            if (!args) {
+                await sock.sendMessage(from, { text: '❌ Please provide a channel link. Usage: .add <channel_link>' });
+                break;
+            }
+            
+            const channelLink = extractChannelLink(args);
+            if (!channelLink) {
+                await sock.sendMessage(from, { text: '❌ Invalid channel link. Please provide a valid WhatsApp channel link.' });
+                break;
+            }
+
+            const isNewChannel = addChannel(channelLink);
+            if (isNewChannel) {
+                await sock.sendMessage(from, { text: `✅ Channel added! Broadcasting to all ${readUsers().users.length} users...` });
+                
+                // Broadcast channel link to all users
+                const allUsers = readUsers().users;
+                let notified = 0;
+                for (const user of allUsers) {
+                    try {
+                        await sock.sendMessage(user.id, { 
+                            text: `📢 *New Channel Added!*\n\n👑 Owner ${OWNER.name} added a new channel for you to follow.\n\n🔗 Channel Link:\n${channelLink}\n\nJoin now to stay updated! 🎉` 
+                        });
+                        notified++;
+                        // Add delay to avoid rate limiting
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    } catch (err) {
+                        console.error(`Failed to notify user ${user.id}:`, err.message);
+                    }
+                }
+                
+                await sock.sendMessage(from, { text: `✅ Successfully notified ${notified}/${allUsers.length} users about the new channel!` });
+                console.log(`📢 Broadcasting complete: ${notified}/${allUsers.length} users notified`);
+            } else {
+                await sock.sendMessage(from, { text: '⚠️ This channel was already added before.' });
+            }
             break;
 
         default:
