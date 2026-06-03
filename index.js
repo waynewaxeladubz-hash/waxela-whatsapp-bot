@@ -8,6 +8,9 @@ const express = require('express');
 const http = require('http');
 require('dotenv').config();
 
+// Import pairing routes
+const pairingRoutes = require('./routes/pairing');
+
 // Owner configuration
 const OWNER = {
     name: 'Wayne',
@@ -225,6 +228,9 @@ const setupWebServer = () => {
 
     app.use(express.static('public'));
     app.use(express.json());
+
+    // Use pairing routes
+    app.use('/api', pairingRoutes);
 
     // Serve QR code endpoint
     app.get('/api/qr', (req, res) => {
