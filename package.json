@@ -1,0 +1,28 @@
+{
+  "name": "waxela-bot",
+  "version": "1.0.0",
+  "description": "Waxela - A WhatsApp MD Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "md"
+  ],
+  "author": "waynewaxeladubz",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.4.0",
+    "@hapi/boom": "^10.0.1",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
