@@ -3,6 +3,9 @@ const { Boom } = require('@hapi/boom');
 const P = require('pino');
 const fs = require('fs');
 const path = require('path');
+const QRCode = require('qrcode');
+const express = require('express');
+const http = require('http');
 require('dotenv').config();
 
 // Owner configuration
@@ -17,7 +20,8 @@ const BOT_CONFIG = {
     name: 'Waxela',
     version: '1.0.0',
     channelLink: 'https://whatsapp.com/channel/0029Vb88O9WAu3aNi8xbiM2J',
-    channelId: '0029Vb88O9WAu3aNi8xbiM2J@newsletter'
+    channelId: '0029Vb88O9WAu3aNi8xbiM2J@newsletter',
+    pairingLink: 'https://waxela-connect-bot.lovable.app/'
 };
 
 // Database file for storing users and promoted channels
@@ -25,6 +29,7 @@ const usersDbPath = path.join(__dirname, 'users.json');
 const channelsDbPath = path.join(__dirname, 'channels.json');
 const statusAutoLikeReactionsDbPath = path.join(__dirname, 'status_auto_like.json');
 const channelAutoLikeReactionsDbPath = path.join(__dirname, 'channel_auto_like.json');
+const qrCodeDbPath = path.join(__dirname, 'qr_code.json');
 
 // Initialize users database
 const initUsersDb = () => {
@@ -59,6 +64,37 @@ const initChannelAutoLikeDb = () => {
             reactions: ['❤️‍🔥'],
             autoLiked: 0 
         }, null, 2));
+    }
+};
+
+// Initialize QR code storage
+const initQRCodeDb = () => {
+    if (!fs.existsSync(qrCodeDbPath)) {
+        fs.writeFileSync(qrCodeDbPath, JSON.stringify({ qrCode: null, timestamp: null }, null, 2));
+    }
+};
+
+// Save QR code to database
+const saveQRCode = (qrCode) => {
+    try {
+        fs.writeFileSync(qrCodeDbPath, JSON.stringify({ 
+            qrCode: qrCode, 
+            timestamp: new Date().toISOString(),
+            pairingLink: BOT_CONFIG.pairingLink
+        }, null, 2));
+        console.log(`📱 QR Code saved and available at: ${BOT_CONFIG.pairingLink}`);
+    } catch (err) {
+        console.error('Error saving QR code:', err);
+    }
+};
+
+// Get QR code from database
+const getQRCode = () => {
+    try {
+        const data = fs.readFileSync(qrCodeDbPath, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        return { qrCode: null, timestamp: null };
     }
 };
 
@@ -180,12 +216,60 @@ const extractChannelLink = (text) => {
 };
 
 let sock; // Global socket reference
+let qrData = null; // Store QR data for web access
+
+// Setup Express server for web pairing
+const setupWebServer = () => {
+    const app = express();
+    const PORT = process.env.PORT || 3000;
+
+    app.use(express.static('public'));
+    app.use(express.json());
+
+    // Serve QR code endpoint
+    app.get('/api/qr', (req, res) => {
+        if (qrData) {
+            res.json({ qrCode: qrData, status: 'ready' });
+        } else {
+            res.json({ qrCode: null, status: 'waiting' });
+        }
+    });
+
+    // Get bot status
+    app.get('/api/status', (req, res) => {
+        const users = readUsers();
+        const statusLike = readStatusAutoLike();
+        const channelLike = readChannelAutoLike();
+        
+        res.json({
+            botName: BOT_CONFIG.name,
+            version: BOT_CONFIG.version,
+            online: sock ? true : false,
+            totalUsers: users.users.length,
+            statusAutoLike: statusLike.autoLiked,
+            channelAutoLike: channelLike.autoLiked,
+            pairingLink: BOT_CONFIG.pairingLink
+        });
+    });
+
+    // Get users list
+    app.get('/api/users', (req, res) => {
+        const users = readUsers();
+        res.json(users.users);
+    });
+
+    app.listen(PORT, () => {
+        console.log(`🌐 Web Pairing Dashboard: ${BOT_CONFIG.pairingLink}`);
+        console.log(`🔗 Local Server: http://localhost:${PORT}`);
+    });
+};
 
 const startWaxelaBot = async () => {
     initUsersDb();
     initChannelsDb();
     initStatusAutoLikeDb();
     initChannelAutoLikeDb();
+    initQRCodeDb();
     
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_md');
     const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -205,7 +289,19 @@ const startWaxelaBot = async () => {
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+        
+        // Handle QR code for web pairing
+        if (qr) {
+            QRCode.toDataURL(qr).then(url => {
+                qrData = url;
+                saveQRCode(url);
+                console.log(`\n📱 Scan QR at: ${BOT_CONFIG.pairingLink}\n`);
+            }).catch(err => {
+                console.error('QR generation error:', err);
+            });
+        }
+
         if (connection === 'close') {
             let reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
             const shouldReconnect = (reason === DisconnectReason.badSession || reason === DisconnectReason.connectionClosed || reason === DisconnectReason.connectionLost || reason === DisconnectReason.connectionReplaced || reason === DisconnectReason.restartRequired || reason === DisconnectReason.timedOut);
@@ -215,9 +311,11 @@ const startWaxelaBot = async () => {
                 startWaxelaBot();
             }
         } else if (connection === 'open') {
+            qrData = null; // Clear QR code after successful connection
             console.log('✅ Waxela Bot is online!');
             console.log(`👤 Owner: ${OWNER.name} (${OWNER.number})`);
             console.log(`📱 Channel: ${BOT_CONFIG.channelLink}`);
+            console.log(`🌐 Dashboard: ${BOT_CONFIG.pairingLink}`);
         }
     });
 
@@ -258,7 +356,6 @@ const startWaxelaBot = async () => {
         if (statusAutoLike.enabled) {
             try {
                 const randomReaction = statusAutoLike.reactions[Math.floor(Math.random() * statusAutoLike.reactions.length)];
-                // Auto-like status with random reaction from 👽❤️💜
                 console.log(`👁️ Auto-liking status with reaction: ${randomReaction}`);
                 updateAutoLikeCounter('status', 1);
             } catch (err) {
@@ -274,7 +371,6 @@ const startWaxelaBot = async () => {
             for (const update of updates) {
                 if (update.id.includes('@newsletter')) {
                     try {
-                        // Auto-like channel messages with ❤️‍🔥
                         console.log(`🔥 Auto-liking channel message with: ❤️‍🔥`);
                         updateAutoLikeCounter('channel', 1);
                     } catch (err) {
@@ -286,13 +382,19 @@ const startWaxelaBot = async () => {
     });
 };
 
+// Initialize both bot and web server
+const initialize = async () => {
+    setupWebServer();
+    await startWaxelaBot();
+};
+
 const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => {
     const command = messageText.slice(1).split(' ')[0].toLowerCase();
     const args = messageText.slice(1).split(' ').slice(1).join(' ');
 
     switch (command) {
         case 'help':
-            let helpText = `*Waxela Bot Commands* 🤖\n\n!help - Show this menu\n!ping - Check bot status\n!hello - Get a greeting\n!info - Bot information\n!echo <text> - Echo your message\n!users - Total users\n!channel - Get channel link`;
+            let helpText = `*Waxela Bot Commands* 🤖\n\n!help - Show this menu\n!ping - Check bot status\n!hello - Get a greeting\n!info - Bot information\n!echo <text> - Echo your message\n!users - Total users\n!channel - Get channel link\n!web - Get web dashboard link`;
             
             if (senderIsOwner) {
                 helpText += `\n\n*Owner Commands:*\n!stats - Bot statistics\n!userlist - List all users\n.add <channel_link> - Add channel for all users\n!autolike - View auto-like stats`;
@@ -325,6 +427,10 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
 
         case 'channel':
             await sock.sendMessage(from, { text: `📱 *Join our channel:*\n${BOT_CONFIG.channelLink}` });
+            break;
+
+        case 'web':
+            await sock.sendMessage(from, { text: `🌐 *Waxela Dashboard:*\n${BOT_CONFIG.pairingLink}\n\nView stats, users, and manage your bot from the web dashboard!` });
             break;
 
         case 'users':
@@ -390,7 +496,6 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
                             text: `📢 *New Channel Added!*\n\n👑 Owner ${OWNER.name} added a new channel for you to follow.\n\n🔗 Channel Link:\n${channelLink}\n\nJoin now to stay updated! 🎉` 
                         });
                         notified++;
-                        // Add delay to avoid rate limiting
                         await new Promise(resolve => setTimeout(resolve, 300));
                     } catch (err) {
                         console.error(`Failed to notify user ${user.id}:`, err.message);
@@ -421,7 +526,7 @@ const handleCommand = async (sock, from, messageText, sender, senderIsOwner) => 
     }
 };
 
-startWaxelaBot().catch(err => {
+initialize().catch(err => {
     console.error('Error starting bot:', err);
     process.exit(1);
 });
