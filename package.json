@@ -1,7 +1,7 @@
 {
   "name": "waxela-bot",
   "version": "1.0.0",
-  "description": "Waxela - A WhatsApp MD Bot",
+  "description": "Waxela - A WhatsApp MD Bot with Web Dashboard",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -11,7 +11,9 @@
     "whatsapp",
     "bot",
     "baileys",
-    "md"
+    "md",
+    "dashboard",
+    "web"
   ],
   "author": "waynewaxeladubz",
   "license": "MIT",
@@ -20,9 +22,14 @@
     "@hapi/boom": "^10.0.1",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 }
